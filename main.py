@@ -1,16 +1,18 @@
+import os
+from datetime import date
+from functools import wraps
+
+from dotenv import load_dotenv
 from flask import Flask, render_template, redirect, url_for, flash, abort
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
-from datetime import date
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_gravatar import Gravatar
+from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
-from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
-from flask_gravatar import Gravatar
-from functools import wraps
-from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
@@ -20,7 +22,8 @@ ckeditor = CKEditor(app)
 Bootstrap(app)
 
 ##CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL",  "sqlite:///blog.db")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///blog.db").replace("postgres://",
+                                                                                                    "postgresql://", 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -36,9 +39,11 @@ gravatar = Gravatar(app,
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
 
 def admin_only(f):
     @wraps(f)
@@ -46,7 +51,9 @@ def admin_only(f):
         if current_user.id != 1:
             return abort(403)
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 ##CONFIGURE TABLES
 
@@ -83,9 +90,9 @@ class Comment(db.Model):
     text = db.Column(db.Text, nullable=False)
 
 
-
 with app.app_context():
     db.create_all()
+
 
 @app.route('/')
 def get_all_posts():
@@ -97,7 +104,7 @@ def get_all_posts():
 def register():
     register_form = RegisterForm()
     if register_form.validate_on_submit():
-        #TODO: Better approach to check if the email already exists in the database
+        # TODO: Better approach to check if the email already exists in the database
         if User.query.filter_by(email=register_form.email.data).first():
             flash("You've already signed up using that email. Log in instead!")
             return redirect(url_for("login"))
@@ -110,9 +117,9 @@ def register():
 
         # noinspection PyArgumentList
         new_user = User(
-            name = register_form.name.data,
-            email = register_form.email.data,
-            password = hash_and_salted_password
+            name=register_form.name.data,
+            email=register_form.email.data,
+            password=hash_and_salted_password
         )
 
         db.session.add(new_user)
@@ -134,7 +141,7 @@ def login():
         user = User.query.filter_by(email=email).first()
         if not user:
             flash("That email does not exist, please try again.")
-            return  redirect(url_for("login"))
+            return redirect(url_for("login"))
         elif not check_password_hash(user.password, password):
             flash("Password is incorrect, please try again.")
             return redirect(url_for("login"))
